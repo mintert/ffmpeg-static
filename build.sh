@@ -39,21 +39,21 @@ mkdir -p "$BUILD_DIR" "$TARGET_DIR"
 
 echo "#### FFmpeg static build, by STVS SA ####"
 cd $BUILD_DIR
-../fetchurl "http://www.tortall.net/projects/yasm/releases/yasm-1.2.0.tar.gz"
+../fetchurl "http://www.tortall.net/projects/yasm/releases/yasm-1.3.0.tar.gz"
 ../fetchurl "http://zlib.net/zlib-1.2.8.tar.gz"
 ../fetchurl "http://www.bzip.org/1.0.6/bzip2-1.0.6.tar.gz"
-../fetchurl "http://downloads.sf.net/project/libpng/libpng15/older-releases/1.5.14/libpng-1.5.14.tar.gz"
-../fetchurl "http://downloads.xiph.org/releases/ogg/libogg-1.3.1.tar.gz"
-../fetchurl "http://downloads.xiph.org/releases/vorbis/libvorbis-1.3.3.tar.gz"
+../fetchurl "http://downloads.sf.net/project/libpng/libpng15/older-releases/1.5.17/libpng-1.5.17.tar.gz"
+../fetchurl "http://downloads.xiph.org/releases/ogg/libogg-1.3.2.tar.gz"
+../fetchurl "http://downloads.xiph.org/releases/vorbis/libvorbis-1.3.4.tar.gz"
 ../fetchurl "http://downloads.xiph.org/releases/theora/libtheora-1.1.1.tar.bz2"
-../fetchurl "http://webm.googlecode.com/files/libvpx-v1.1.0.tar.bz2"
+../fetchurl "http://webm.googlecode.com/files/libvpx-v1.3.0.tar.bz2"
 ../fetchurl "http://downloads.sourceforge.net/project/faac/faac-src/faac-1.28/faac-1.28.tar.bz2"
 ../fetchurl "ftp://ftp.videolan.org/pub/x264/snapshots/last_x264.tar.bz2"
-../fetchurl "http://downloads.xvid.org/downloads/xvidcore-1.3.2.tar.gz"
+../fetchurl "http://downloads.xvid.org/downloads/xvidcore-1.3.3.tar.gz"
 ../fetchurl "http://downloads.sourceforge.net/project/lame/lame/3.99/lame-3.99.5.tar.gz"
 ../fetchurl "http://downloads.xiph.org/releases/opus/opus-1.1.tar.gz"
 git clone git://git.ffmpeg.org/rtmpdump
-../fetchurl "http://www.ffmpeg.org/releases/ffmpeg-2.1.4.tar.bz2"
+../fetchurl "http://www.ffmpeg.org/releases/ffmpeg-2.3.2.tar.bz2"
 
 echo "*** Building yasm ***"
 cd $BUILD_DIR/yasm*
@@ -69,8 +69,8 @@ make install
 
 echo "*** Building librtmp ***"
 cd $BUILD_DIR/rtmp*
-make SYS=posix -j $jval
-make install prefix=$TARGET_DIR
+make SYS=posix -j $jval SHARED=
+make install prefix=$TARGET_DIR SHARED=no
 
 echo "*** Building bzip2 ***"
 cd $BUILD_DIR/bzip2*
@@ -150,5 +150,9 @@ rm -f "$TARGET_DIR/lib/*.so"
 # FFMpeg
 echo "*** Building FFmpeg ***"
 cd $BUILD_DIR/ffmpeg*
+# comment out the "require_pkg_config librtmp ..." line
+# this line assumes you have installed librtmp to your /usr/lib64 
+# but here i want a "static" build
+sed -i.bak '/enabled librtmp/s/^/# /' configure
 CFLAGS="-I$TARGET_DIR/include" LDFLAGS="-L$TARGET_DIR/lib -lm" ./configure --prefix=${OUTPUT_DIR:-$TARGET_DIR} --extra-cflags="-I$TARGET_DIR/include -static" --extra-ldflags="-L$TARGET_DIR/lib -lm -static" --extra-version=static --disable-debug --disable-shared --enable-static --extra-cflags=--static --disable-ffplay --disable-ffserver --disable-doc --enable-gpl --enable-pthreads --enable-postproc --enable-gray --enable-runtime-cpudetect --enable-libfaac --enable-libmp3lame --enable-libopus --enable-libtheora --enable-libvorbis --enable-libx264 --enable-libxvid --enable-bzlib --enable-zlib --enable-nonfree --enable-version3 --enable-libvpx --disable-devices --enable-librtmp
 make -j $jval && make install
