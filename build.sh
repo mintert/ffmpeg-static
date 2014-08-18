@@ -78,6 +78,7 @@ echo "*** Building librtmp ***"
 cd $BUILD_DIR/rtmp*
 
 # patch rtmpdump makefile to include -ldl
+# reference :  http://pcloadletter.co.uk/2011/12/30/compiling-ffmpeg-0-9-with-librtmp/
 sed -i.bak -e '/^LIB_OPENSSL\=/s/lcrypto/lcrypto \-ldl/' Makefile
 
 make SYS=posix -j $jval SHARED= INC=-I$TARGET_DIR/include LDFLAGS=-L$TARGET_DIR/lib
