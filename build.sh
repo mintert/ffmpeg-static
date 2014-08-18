@@ -52,6 +52,7 @@ cd $BUILD_DIR
 ../fetchurl "http://downloads.xvid.org/downloads/xvidcore-1.3.3.tar.gz"
 ../fetchurl "http://downloads.sourceforge.net/project/lame/lame/3.99/lame-3.99.5.tar.gz"
 ../fetchurl "http://downloads.xiph.org/releases/opus/opus-1.1.tar.gz"
+../fetchurl "https://www.openssl.org/source/openssl-1.0.1i.tar.gz"
 git clone git://git.ffmpeg.org/rtmpdump
 ../fetchurl "http://www.ffmpeg.org/releases/ffmpeg-2.3.2.tar.bz2"
 
@@ -67,10 +68,20 @@ cd $BUILD_DIR/zlib*
 make -j $jval
 make install
 
+echo "*** Building openssl ***"
+cd $BUILD_DIR/openssl*
+./config --prefix=$TARGET_DIR no-shared
+make
+make install
+
 echo "*** Building librtmp ***"
 cd $BUILD_DIR/rtmp*
-make SYS=posix -j $jval SHARED=
-make install prefix=$TARGET_DIR SHARED=no
+
+# patch rtmpdump makefile to include -ldl
+sed -i.bak -e '/^LIB_OPENSSL\=/s/lcrypto/lcrypto \-ldl/' Makefile
+
+make SYS=posix -j $jval SHARED= INC=-I$TARGET_DIR/include LDFLAGS=-L$TARGET_DIR/lib
+make install prefix=$TARGET_DIR SHARED= 
 
 echo "*** Building bzip2 ***"
 cd $BUILD_DIR/bzip2*
@@ -150,9 +161,11 @@ rm -f "$TARGET_DIR/lib/*.so"
 # FFMpeg
 echo "*** Building FFmpeg ***"
 cd $BUILD_DIR/ffmpeg*
+
 # comment out the "require_pkg_config librtmp ..." line
 # this line assumes you have installed librtmp to your /usr/lib64 
 # but here i want a "static" build
-sed -i.bak '/enabled librtmp/s/^/# /' configure
-CFLAGS="-I$TARGET_DIR/include" LDFLAGS="-L$TARGET_DIR/lib -lm" ./configure --prefix=${OUTPUT_DIR:-$TARGET_DIR} --extra-cflags="-I$TARGET_DIR/include -static" --extra-ldflags="-L$TARGET_DIR/lib -lm -static" --extra-version=static --disable-debug --disable-shared --enable-static --extra-cflags=--static --disable-ffplay --disable-ffserver --disable-doc --enable-gpl --enable-pthreads --enable-postproc --enable-gray --enable-runtime-cpudetect --enable-libfaac --enable-libmp3lame --enable-libopus --enable-libtheora --enable-libvorbis --enable-libx264 --enable-libxvid --enable-bzlib --enable-zlib --enable-nonfree --enable-version3 --enable-libvpx --disable-devices --enable-librtmp
+# sed -i.bak '/enabled librtmp/s/^/# /' configure
+
+CFLAGS="-I$TARGET_DIR/include" LDFLAGS="-L$TARGET_DIR/lib -lm" ./configure --prefix=${OUTPUT_DIR:-$TARGET_DIR} --extra-cflags="-I$TARGET_DIR/include -static" --extra-ldflags="-L$TARGET_DIR/lib -lm -static" --extra-version=static --disable-debug --disable-shared --enable-static --extra-cflags=--static --disable-ffplay --disable-ffserver --disable-doc --enable-gpl --enable-pthreads --enable-postproc --enable-gray --enable-runtime-cpudetect --enable-libfaac --enable-libmp3lame --enable-libopus --enable-libtheora --enable-libvorbis --enable-libx264 --enable-libxvid --enable-bzlib --enable-zlib --enable-nonfree --enable-version3 --enable-libvpx --disable-devices --enable-librtmp  --extra-libs="-ldl"
 make -j $jval && make install
