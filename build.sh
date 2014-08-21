@@ -182,7 +182,7 @@ cd $BUILD_DIR/libXext
 git checkout tags/libXext-1.3.3
 export ACLOCAL="aclocal -I $TARGET_DIR/share/aclocal"
 ./autogen.sh
-./configure --prefix=$TARGET_DIR
+./configure --prefix=$TARGET_DIR --enable-static --enable-shared=no
 make -j $jval
 make install
 
