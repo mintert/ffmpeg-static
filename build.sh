@@ -9,12 +9,12 @@ jval=2
 while getopts 'j:' OPTION
 do
   case $OPTION in
-  j)	jflag=1
-        	jval="$OPTARG"
-	        ;;
-  ?)	printf "Usage: %s: [-j concurrency_level] (hint: your cores + 20%%)\n" $(basename $0) >&2
-		exit 2
-		;;
+  j)  jflag=1
+          jval="$OPTARG"
+          ;;
+  ?)  printf "Usage: %s: [-j concurrency_level] (hint: your cores + 20%%)\n" $(basename $0) >&2
+    exit 2
+    ;;
   esac
 done
 shift $(($OPTIND - 1))
@@ -159,6 +159,33 @@ make install
 rm -f "$TARGET_DIR/lib/*.dylib"
 rm -f "$TARGET_DIR/lib/*.so"
 
+
+# --------------------------------------
+# for --enable-x11grab
+# --------------------------------------
+# in order to run autogen, needs xorg-macros 1.12 or later
+echo "*** Building xorg-macros ***"
+cd $BUILD_DIR
+git clone http://anongit.freedesktop.org/git/xorg/util/macros.git
+cd $BUILD_DIR/macros
+git checkout tags/util-macros-1.19.0
+./autogen.sh
+./configure --prefix=$TARGET_DIR
+make -j $jval
+make install
+
+# libXext after enabling x11grab
+echo "*** Building libXext ***"
+cd $BUILD_DIR
+git clone http://anongit.freedesktop.org/git/xorg/lib/libXext.git
+cd $BUILD_DIR/libXext
+git checkout tags/libXext-1.3.3
+export ACLOCAL="aclocal -I $TARGET_DIR/share/aclocal"
+./autogen.sh
+./configure --prefix=$TARGET_DIR
+make -j $jval
+make install
+
 # FFMpeg
 echo "*** Building FFmpeg ***"
 cd $BUILD_DIR/ffmpeg*
@@ -168,5 +195,5 @@ cd $BUILD_DIR/ffmpeg*
 # but here i want a "static" build
 # sed -i.bak '/enabled librtmp/s/^/# /' configure
 
-CFLAGS="-I$TARGET_DIR/include" LDFLAGS="-L$TARGET_DIR/lib -lm" ./configure --prefix=${OUTPUT_DIR:-$TARGET_DIR} --extra-cflags="-I$TARGET_DIR/include -static" --extra-ldflags="-L$TARGET_DIR/lib -lm -static" --extra-version=static --disable-debug --disable-shared --enable-static --extra-cflags=--static --disable-ffplay --disable-ffserver --disable-doc --enable-gpl --enable-pthreads --enable-postproc --enable-gray --enable-runtime-cpudetect --enable-libfaac --enable-libmp3lame --enable-libopus --enable-libtheora --enable-libvorbis --enable-libx264 --enable-libxvid --enable-bzlib --enable-zlib --enable-nonfree --enable-version3 --enable-libvpx --disable-devices --enable-librtmp  --extra-libs="-ldl"
+CFLAGS="-I$TARGET_DIR/include" LDFLAGS="-L$TARGET_DIR/lib -lm" ./configure --prefix=${OUTPUT_DIR:-$TARGET_DIR} --extra-cflags="-I$TARGET_DIR/include -static" --extra-ldflags="-L$TARGET_DIR/lib -lm -static" --extra-version=static --disable-debug --disable-shared --enable-static --extra-cflags=--static --disable-ffplay --disable-ffserver --disable-doc --enable-gpl --enable-pthreads --enable-postproc --enable-gray --enable-runtime-cpudetect --enable-libfaac --enable-libmp3lame --enable-libopus --enable-libtheora --enable-libvorbis --enable-libx264 --enable-libxvid --enable-bzlib --enable-zlib --enable-nonfree --enable-version3 --enable-libvpx --disable-devices --enable-librtmp  --extra-libs="-ldl -lXext" --enable-x11grab --enable-gpl
 make -j $jval && make install
