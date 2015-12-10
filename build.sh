@@ -54,7 +54,7 @@ cd $BUILD_DIR
 ../fetchurl "http://downloads.xiph.org/releases/opus/opus-1.1.1.tar.gz"
 ../fetchurl "https://www.openssl.org/source/openssl-1.0.1q.tar.gz"
 git clone git://git.ffmpeg.org/rtmpdump
-../fetchurl "http://ffmpeg.org/releases/ffmpeg-2.8.3.tar.bz2"
+git clone git://source.ffmpeg.org/ffmpeg.git
 
 echo "*** Building yasm ***"
 cd $BUILD_DIR/yasm*
