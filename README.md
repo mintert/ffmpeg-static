@@ -6,6 +6,8 @@ Three scripts to make a static build of ffmpeg with all the latest codecs (webm 
 Just follow the instructions below. Once you have the build dependencies,
 just run ./build.sh, wait and you should get the ffmpeg binary in target/bin
 
+这个和原版的不同之处是加了--enable-librtmp, 因为在c**fuck项目中需要用到rtmps
+
 Build dependencies
 ------------------
 
