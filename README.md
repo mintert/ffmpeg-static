@@ -8,6 +8,14 @@ just run ./build.sh, wait and you should get the ffmpeg binary in target/bin
 
 这个和原版的不同之处是加了--enable-librtmp, 因为在c**fuck项目中需要用到rtmps
 
+What's New
+------------------
+12/11/2015
+* 更新各libs的新版下载链接，ffmpeg最近版本到了2.8.3,链接改成了从git server下的
+* 增加x265
+* x11grab现在改成用xcb的了
+
+
 Build dependencies
 ------------------
 
