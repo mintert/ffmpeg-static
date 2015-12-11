@@ -47,14 +47,16 @@ cd $BUILD_DIR
 ../fetchurl "http://downloads.xiph.org/releases/vorbis/libvorbis-1.3.5.tar.gz"
 ../fetchurl "http://downloads.xiph.org/releases/theora/libtheora-1.1.1.tar.bz2"
 ../fetchurl "http://storage.googleapis.com/downloads.webmproject.org/releases/webm/libvpx-1.5.0.tar.bz2"
-../fetchurl "http://downloads.sourceforge.net/project/faac/faac-src/faac-1.28/faac-1.28.tar.bz2"
+# ../fetchurl "http://downloads.sourceforge.net/project/faac/faac-src/faac-1.28/faac-1.28.tar.bz2"
 ../fetchurl "ftp://ftp.videolan.org/pub/x264/snapshots/last_x264.tar.bz2"
 ../fetchurl "http://downloads.xvid.org/downloads/xvidcore-1.3.4.tar.gz"
 ../fetchurl "http://downloads.sourceforge.net/project/lame/lame/3.99/lame-3.99.5.tar.gz"
 ../fetchurl "http://downloads.xiph.org/releases/opus/opus-1.1.1.tar.gz"
 ../fetchurl "https://www.openssl.org/source/openssl-1.0.1q.tar.gz"
 git clone git://git.ffmpeg.org/rtmpdump
-git clone git://source.ffmpeg.org/ffmpeg.git
+git clone --depth 1 git://source.ffmpeg.org/ffmpeg.git
+hg clone https://bitbucket.org/multicoreware/x265
+git clone --depth 1 git://git.code.sf.net/p/opencore-amr/fdk-aac
 
 echo "*** Building yasm ***"
 cd $BUILD_DIR/yasm*
@@ -121,20 +123,38 @@ cd $BUILD_DIR/libvpx*
 make -j $jval
 make install
 
-echo "*** Building faac ***"
-cd $BUILD_DIR/faac*
-./configure --prefix=$TARGET_DIR --enable-static --disable-shared
-# FIXME: gcc incompatibility, does not work with log()
+# echo "*** Building faac ***"
+# cd $BUILD_DIR/faac*
+# ./configure --prefix=$TARGET_DIR --enable-static --disable-shared
+# # FIXME: gcc incompatibility, does not work with log()
 
-sed -i -e "s|^char \*strcasestr.*|//\0|" common/mp4v2/mpeg4ip.h
+# sed -i -e "s|^char \*strcasestr.*|//\0|" common/mp4v2/mpeg4ip.h
+# make -j $jval
+# make install
+
+
+echo "*** Building fdk_aac ***"
+cd $BUILD_DIR/fdk-aac*
+autoreconf -fiv
+./configure --prefix=$TARGET_DIR --disable-shared
 make -j $jval
 make install
+
 
 echo "*** Building x264 ***"
 cd $BUILD_DIR/x264*
 ./configure --prefix=$TARGET_DIR --enable-static --disable-shared --disable-opencl
 make -j $jval
 make install
+
+echo "*** Building x265 ***"
+cd $BUILD_DIR/x265*
+cd build/linux
+cmake -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX=$TARGET_DIR -DENABLE_SHARED:bool=off ../../source
+# ./configure --prefix=$TARGET_DIR --enable-static --disable-shared --disable-opencl
+make -j $jval
+make install
+
 
 echo "*** Building xvidcore ***"
 cd "$BUILD_DIR/xvidcore/build/generic"
@@ -160,31 +180,31 @@ rm -f "$TARGET_DIR/lib/*.dylib"
 rm -f "$TARGET_DIR/lib/*.so"
 
 
-# --------------------------------------
-# for --enable-x11grab
-# --------------------------------------
-# in order to run autogen, needs xorg-macros 1.12 or later
-echo "*** Building xorg-macros ***"
-cd $BUILD_DIR
-git clone http://anongit.freedesktop.org/git/xorg/util/macros.git
-cd $BUILD_DIR/macros
-git checkout tags/util-macros-1.19.0
-./autogen.sh
-./configure --prefix=$TARGET_DIR
-make -j $jval
-make install
+# # --------------------------------------
+# # for --enable-x11grab
+# # --------------------------------------
+# # in order to run autogen, needs xorg-macros 1.12 or later
+# echo "*** Building xorg-macros ***"
+# cd $BUILD_DIR
+# git clone http://anongit.freedesktop.org/git/xorg/util/macros.git
+# cd $BUILD_DIR/macros
+# git checkout tags/util-macros-1.19.0
+# ./autogen.sh
+# ./configure --prefix=$TARGET_DIR
+# make -j $jval
+# make install
 
-# libXext after enabling x11grab
-echo "*** Building libXext ***"
-cd $BUILD_DIR
-git clone http://anongit.freedesktop.org/git/xorg/lib/libXext.git
-cd $BUILD_DIR/libXext
-git checkout tags/libXext-1.3.3
-export ACLOCAL="aclocal -I $TARGET_DIR/share/aclocal"
-./autogen.sh
-./configure --prefix=$TARGET_DIR --enable-static --enable-shared=no
-make -j $jval
-make install
+# # libXext after enabling x11grab
+# echo "*** Building libXext ***"
+# cd $BUILD_DIR
+# git clone http://anongit.freedesktop.org/git/xorg/lib/libXext.git
+# cd $BUILD_DIR/libXext
+# git checkout tags/libXext-1.3.3
+# export ACLOCAL="aclocal -I $TARGET_DIR/share/aclocal"
+# ./autogen.sh
+# ./configure --prefix=$TARGET_DIR --enable-static --enable-shared=no
+# make -j $jval
+# make install
 
 # FFMpeg
 echo "*** Building FFmpeg ***"
@@ -195,5 +215,9 @@ cd $BUILD_DIR/ffmpeg*
 # but here i want a "static" build
 # sed -i.bak '/enabled librtmp/s/^/# /' configure
 
-CFLAGS="-I$TARGET_DIR/include" LDFLAGS="-L$TARGET_DIR/lib -lm" ./configure --prefix=${OUTPUT_DIR:-$TARGET_DIR} --extra-cflags="-I$TARGET_DIR/include -static" --extra-ldflags="-L$TARGET_DIR/lib -lm -static" --extra-version=static --disable-debug --disable-shared --enable-static --extra-cflags=--static --disable-ffplay --disable-ffserver --disable-doc --enable-gpl --enable-pthreads --enable-postproc --enable-gray --enable-runtime-cpudetect --enable-libfaac --enable-libmp3lame --enable-libopus --enable-libtheora --enable-libvorbis --enable-libx264 --enable-libxvid --enable-bzlib --enable-zlib --enable-nonfree --enable-version3 --enable-libvpx --disable-devices --enable-librtmp  --extra-libs="-ldl -lXext" --enable-x11grab --enable-gpl
+# CFLAGS="-I$TARGET_DIR/include" LDFLAGS="-L$TARGET_DIR/lib -lm" ./configure --prefix=${OUTPUT_DIR:-$TARGET_DIR} --extra-cflags="-I$TARGET_DIR/include -static" --extra-ldflags="-L$TARGET_DIR/lib -lm -static" --extra-version=static --disable-debug --disable-shared --enable-static --extra-cflags=--static --disable-ffplay --disable-ffserver --disable-doc --enable-gpl --enable-pthreads --enable-postproc --enable-gray --enable-runtime-cpudetect --enable-libfaac --enable-libmp3lame --enable-libopus --enable-libtheora --enable-libvorbis --enable-libx264 --enable-libx265 --enable-libxvid --enable-bzlib --enable-zlib --enable-nonfree --enable-version3 --enable-libvpx --disable-devices --enable-librtmp  --extra-libs="-ldl -lXext" --enable-x11grab --enable-gpl --pkg-config-flags="--static"
+
+
+CFLAGS="-I$TARGET_DIR/include" LDFLAGS="-L$TARGET_DIR/lib" ./configure --prefix=${OUTPUT_DIR:-$TARGET_DIR} --extra-cflags="-I$TARGET_DIR/include" --extra-ldflags="-L$TARGET_DIR/lib"  --pkg-config-flags="--static" --enable-gpl --enable-nonfree --enable-libfdk-aac --enable-libfreetype --enable-libmp3lame --enable-libopus --enable-libvorbis --enable-libvpx --enable-libx264 --enable-libx265 --enable-librtmp
+
 make -j $jval && make install
