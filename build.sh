@@ -79,7 +79,7 @@ export CFLAGS="$CFLAGS -DOPJ_STATIC"
 ./configure --prefix=$TARGET_DIR --disable-shared --enable-static
 make -j $jval
 make install
-export CFLAGS=$old_cflags
+export CFLAGS="$old_cflags"
 
 
 echo "*** Building libnettle ***"
