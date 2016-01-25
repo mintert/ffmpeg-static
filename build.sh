@@ -73,17 +73,18 @@ make install
 
 echo "*** Building libopenjpeg ***"
 cd $BUILD_DIR/openjpeg*
+old_cflags="$CFLAGS"
 export CFLAGS="$CFLAGS -DOPJ_STATIC"
 ./bootstrap.sh
 ./configure --prefix=$TARGET_DIR --disable-shared --enable-static
 make -j $jval
 make install
-export CFLAGS=""
+export CFLAGS=$old_cflags
 
 
 echo "*** Building libnettle ***"
 cd $BUILD_DIR/nettle*
-./configure --disable-openssl
+./configure --prefix=$TARGET_DIR --disable-openssl --enable-static --disable-shared
 make -j $jval
 make install
 
