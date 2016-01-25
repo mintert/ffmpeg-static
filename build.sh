@@ -42,19 +42,56 @@ cd $BUILD_DIR
 ../fetchurl "http://www.tortall.net/projects/yasm/releases/yasm-1.3.0.tar.gz"
 ../fetchurl "http://zlib.net/zlib-1.2.8.tar.gz"
 ../fetchurl "http://www.bzip.org/1.0.6/bzip2-1.0.6.tar.gz"
-../fetchurl "http://downloads.sourceforge.net/project/libpng/libpng15/1.5.25/libpng-1.5.25.tar.gz"
-../fetchurl "http://downloads.xiph.org/releases/ogg/libogg-1.3.2.tar.gz"
-../fetchurl "http://downloads.xiph.org/releases/vorbis/libvorbis-1.3.5.tar.gz"
-../fetchurl "http://downloads.xiph.org/releases/theora/libtheora-1.1.1.tar.bz2"
-../fetchurl "http://storage.googleapis.com/downloads.webmproject.org/releases/webm/libvpx-1.5.0.tar.bz2"
-../fetchurl "http://downloads.sourceforge.net/project/faac/faac-src/faac-1.28/faac-1.28.tar.bz2"
 ../fetchurl "ftp://ftp.videolan.org/pub/x264/snapshots/last_x264.tar.bz2"
-../fetchurl "http://downloads.xvid.org/downloads/xvidcore-1.3.4.tar.gz"
 ../fetchurl "http://downloads.sourceforge.net/project/lame/lame/3.99/lame-3.99.5.tar.gz"
-../fetchurl "http://downloads.xiph.org/releases/opus/opus-1.1.1.tar.gz"
 ../fetchurl "https://www.openssl.org/source/openssl-1.0.1q.tar.gz"
 git clone git://git.ffmpeg.org/rtmpdump
-git clone git://source.ffmpeg.org/ffmpeg.git
+git clone https://github.com/mintert/FFmpeg.git
+../fetchurl "http://www.lysator.liu.se/~nisse/archive/nettle-2.7.1.tar.gz"
+wget "ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-3.3.19.tar.xz"
+tar xf gnutls-3.3.19.tar.xz
+rm -f gnutls-3.3.19.tar.xz
+../fetchurl "http://downloads.sourceforge.net/project/openjpeg.mirror/1.5.2/openjpeg-1.5.2.tar.gz"
+../fetchurl "https://github.com/georgmartius/vid.stab/archive/release-0.98.tar.gz"
+../fetchurl "http://downloads.sourceforge.net/project/opencore-amr/vo-aacenc/vo-aacenc-0.1.3.tar.gz"
+
+
+echo "*** Building vidstab ***"
+cd $BUILD_DIR/vid.stab*
+sed -i.bak "s/SHARED/STATIC/g" CMakeLists.txt
+cmake –G”Unix Makefiles” . -DENABLE_STATIC_RUNTIME=1 -DCMAKE_INSTALL_PREFIX=$TARGET_DIR || exit 1
+make -j $jval
+make install
+
+
+echo "*** Building vo_aacenc ***"
+cd $BUILD_DIR/vo-aacenc*
+./configure --prefix=$TARGET_DIR --disable-shared --enable-static
+make -j $jval
+make install
+
+
+echo "*** Building libopenjpeg ***"
+cd $BUILD_DIR/openjpeg*
+export CFLAGS="$CFLAGS -DOPJ_STATIC"
+./bootstrap.sh
+./configure --prefix=$TARGET_DIR --disable-shared --enable-static
+make -j $jval
+make install
+export CFLAGS=""
+
+
+echo "*** Building libnettle ***"
+cd $BUILD_DIR/nettle*
+./configure --disable-openssl
+make -j $jval
+make install
+
+echo "*** Building gnutls ***"
+cd $BUILD_DIR/gnutls*
+./configure --prefix=$TARGET_DIR --disable-cxx --disable-doc --enable-local-libopts --disable-guile --enable-static --disable-shared
+make -j $jval
+make install
 
 echo "*** Building yasm ***"
 cd $BUILD_DIR/yasm*
@@ -74,61 +111,10 @@ cd $BUILD_DIR/openssl*
 make
 make install
 
-echo "*** Building librtmp ***"
-cd $BUILD_DIR/rtmp*
-
-# patch rtmpdump makefile to include -ldl
-# reference :  http://pcloadletter.co.uk/2011/12/30/compiling-ffmpeg-0-9-with-librtmp/
-sed -i.bak -e '/^LIB_OPENSSL\=/s/lcrypto/lcrypto \-ldl/' Makefile
-
-make SYS=posix -j $jval SHARED= INC=-I$TARGET_DIR/include LDFLAGS=-L$TARGET_DIR/lib
-make install prefix=$TARGET_DIR SHARED= 
-
 echo "*** Building bzip2 ***"
 cd $BUILD_DIR/bzip2*
 make
 make install PREFIX=$TARGET_DIR
-
-echo "*** Building libpng ***"
-cd $BUILD_DIR/libpng*
-./configure --prefix=$TARGET_DIR --enable-static --disable-shared
-make -j $jval
-make install
-
-# Ogg before vorbis
-echo "*** Building libogg ***"
-cd $BUILD_DIR/libogg*
-./configure --prefix=$TARGET_DIR --enable-static --disable-shared
-make -j $jval
-make install
-
-# Vorbis before theora
-echo "*** Building libvorbis ***"
-cd $BUILD_DIR/libvorbis*
-./configure --prefix=$TARGET_DIR --enable-static --disable-shared
-make -j $jval
-make install
-
-echo "*** Building libtheora ***"
-cd $BUILD_DIR/libtheora*
-./configure --prefix=$TARGET_DIR --enable-static --disable-shared
-make -j $jval
-make install
-
-echo "*** Building livpx ***"
-cd $BUILD_DIR/libvpx*
-./configure --prefix=$TARGET_DIR --disable-shared
-make -j $jval
-make install
-
-echo "*** Building faac ***"
-cd $BUILD_DIR/faac*
-./configure --prefix=$TARGET_DIR --enable-static --disable-shared
-# FIXME: gcc incompatibility, does not work with log()
-
-sed -i -e "s|^char \*strcasestr.*|//\0|" common/mp4v2/mpeg4ip.h
-make -j $jval
-make install
 
 echo "*** Building x264 ***"
 cd $BUILD_DIR/x264*
@@ -136,37 +122,44 @@ cd $BUILD_DIR/x264*
 make -j $jval
 make install
 
-echo "*** Building xvidcore ***"
-cd "$BUILD_DIR/xvidcore/build/generic"
-./configure --prefix=$TARGET_DIR --enable-static --disable-shared
-make -j $jval
-make install
-#rm $TARGET_DIR/lib/libxvidcore.so.*
-
 echo "*** Building lame ***"
 cd $BUILD_DIR/lame*
 ./configure --prefix=$TARGET_DIR --enable-static --disable-shared
 make -j $jval
 make install
 
-echo "*** Building opus ***"
-cd $BUILD_DIR/opus*
-./configure --prefix=$TARGET_DIR --enable-static --disable-shared
-make -j $jval
-make install
-
-# FIXME: only OS-specific
-rm -f "$TARGET_DIR/lib/*.dylib"
-rm -f "$TARGET_DIR/lib/*.so"
-
 # FFMpeg
 echo "*** Building FFmpeg ***"
-cd $BUILD_DIR/ffmpeg*
+cd $BUILD_DIR/FFmpeg*
 
-# comment out the "require_pkg_config librtmp ..." line
-# this line assumes you have installed librtmp to your /usr/lib64 
-# but here i want a "static" build
-# sed -i.bak '/enabled librtmp/s/^/# /' configure
+postpend_configure_opts="--disable-decoders --disable-encoders --enable-encoder=png --enable-encoder=apng --enable-enco$
+postpend_configureOpts="--enable-static --disable-shared $postpend_configure_opts"
 
-CFLAGS="-I$TARGET_DIR/include" LDFLAGS="-L$TARGET_DIR/lib -lm" ./configure --prefix=${OUTPUT_DIR:-$TARGET_DIR} --extra-cflags="-I$TARGET_DIR/include -static" --extra-ldflags="-L$TARGET_DIR/lib -lm -static" --extra-version=static --disable-debug --disable-shared --enable-static --extra-cflags=--static --disable-ffplay --disable-ffserver --disable-doc --enable-gpl --enable-pthreads --enable-postproc --enable-gray --enable-runtime-cpudetect --enable-libfaac --enable-libmp3lame --enable-libopus --enable-libtheora --enable-libvorbis --enable-libx264 --enable-libxvid --enable-bzlib --enable-zlib --enable-nonfree --enable-version3 --enable-libvpx --disable-devices --enable-librtmp  --extra-libs="-ldl"
+CFLAGS="-I$TARGET_DIR/include" \
+LDFLAGS="-L$TARGET_DIR/lib -lm" \
+./configure \
+  --extra-cflags="-I$TARGET_DIR/include -static" \
+  --extra-ldflags="-L$TARGET_DIR/lib -lm -static" \
+  --pkg-config-flags=--static \
+  --extra-version=static \
+  --disable-debug \
+  --extra-cflags=--static \
+  --disable-ffplay \
+  --disable-ffserver \
+  --disable-doc \
+  --enable-gpl \
+  --enable-libx264 \
+  --enable-version3 \
+  --enable-libmp3lame \
+  --enable-zlib \
+  --enable-libopenjpeg \
+  --enable-gnutls \
+  --enable-libfreetype \
+  --enable-zlib \
+  --enable-bzlib \
+  --enable-gray \
+  --enable-runtime-cpudetect \
+  --extra-libs="-ldl" \
+  $postpend_configure_opts \
+  --prefix=${OUTPUT_DIR:-$TARGET_DIR}
 make -j $jval && make install
