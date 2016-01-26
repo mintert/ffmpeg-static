@@ -1,166 +1,404 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
-set -e
-set -u
+#set -e
+#set -u
 
-jflag=
-jval=2
+check_missing_packages() {
+  local check_packages=('curl' 'pkg-config' 'make' 'git' 'cmake' 'gcc' 'autoconf' 'automake' 'yasm' 'cvs' 'flex' 'bison' 'makeinfo' 'g++' 'ed' 'hg' 'pax' 'unzip' 'patch' 'wget' 'xz')
+  check_packages+=(libtoolize)
 
-while getopts 'j:' OPTION
-do
-  case $OPTION in
-  j)	jflag=1
-        	jval="$OPTARG"
-	        ;;
-  ?)	printf "Usage: %s: [-j concurrency_level] (hint: your cores + 20%%)\n" $(basename $0) >&2
-		exit 2
-		;;
-  esac
-done
-shift $(($OPTIND - 1))
+  for package in "${check_packages[@]}"; do
+    type -P "$package" >/dev/null || missing_packages=("$package" "${missing_packages[@]}")
+  done
 
-if [ "$jflag" ]
-then
-  if [ "$jval" ]
-  then
-    printf "Option -j specified (%d)\n" $jval
+  if [[ -n "${missing_packages[@]}" ]]; then
+    clear
+    echo "Could not find the following execs : ${missing_packages[@]}"
+    echo 'Install the missing packages before running this script.'
+    echo "for ubuntu: $ sudo apt-get install curl texinfo g++ bison flex cvs yasm automake libtool autoconf gcc cmake git make pkg-config zlib1g-dev mercurial unzip pax -y" 
+    exit 1
+  fi
+
+  local out=`cmake --version` # like cmake version 2.8.7
+  local version_have=`echo "$out" | cut -d " " -f 3`
+
+  function version { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
+
+  if [[ $(version $version_have)  < $(version '2.8.10') ]]; then
+    echo "your cmake version is too old $version_have wanted 2.8.10"
+    exit 1
+  fi
+
+  out=`yasm --version`
+  yasm_version=`echo "$out" | cut -d " " -f 2` # like 1.1.0.112
+  if [[ $(version $yasm_version)  < $(version '1.2.0') ]]; then
+    echo "your yasm version is too old $yasm_version wanted 1.2.0"
+    exit 1
+  fi
+}
+
+build_ffmpeg() {
+  local postpend_configure_opts="--disable-decoders --disable-encoders --enable-encoder=png --enable-encoder=apng --enable-encoder=ljpeg --enable-encoder=jpeg2000 --enable-encoder=bmp --enable-encoder=libx264 --enable-encoder=rawvideo --enable-decoder=png --enable-decoder=apng --enable-decoder=jpeg2000 --enable-decoder=bmp --enable-decoder=aac --enable-avisynth --enable-libvo_aacenc --enable-encoder=libvo_aacenc --enable-decoder=pcm_s16le --enable-decoder=pcm_f64le --enable-decoder=rawvideo --enable-encoder=mjpeg --enable-decoder=mjpeg --extra-libs=-lstdc++ --extra-libs=-lpng --enable-libvidstab"
+  postpend_configure_opts="--enable-static --disable-shared $postpend_configure_opts --prefix=${OUTPUT_DIR:-$TARGET_DIR}"
+
+  do_git_checkout $ffmpeg_git ffmpeg
+  cd ffmpeg
+    config_options="--enable-gpl --enable-libx264 --enable-version3 --enable-libmp3lame --enable-zlib --enable-libopenjpeg --enable-gnutls --enable-libfreetype  --enable-bzlib"
+    config_options="$config_options --pkg-config-flags=--static --extra-version=static --extra-cflags=-I${TARGET_DIR}/include --extra-ldflags=-L${TARGET_DIR}/lib --extra-libs=-ldl"
+    config_options="$config_options --disable-debug --disable-ffplay --disable-ffserver --disable-doc"
+
+    config_options="$config_options $postpend_configure_opts"
+    do_configure "$config_options"
+
+    if [[ $force_ffmpeg_rebuild = "y" ]]; then
+      rm -f already_ran_make*
+    fi
+
+    do_make_and_make_install
+  cd ..
+}
+
+build_dependencies() {
+  build_gmp
+  build_libnettle
+  build_vidstab
+  build_gnutls
+  build_openjpeg
+  build_vo_aacenc
+  build_zlib
+  build_bzlib2
+  build_x264
+  build_lame
+}
+
+build_gmp() {
+  download_and_unpack_file https://gmplib.org/download/gmp/gmp-6.0.0a.tar.xz gmp-6.0.0
+  cd gmp-6.0.0
+    generic_configure
+    do_make_and_make_install
+  cd ..
+}
+
+build_libnettle() {
+  download_and_unpack_file http://www.lysator.liu.se/~nisse/archive/nettle-2.7.1.tar.gz nettle-2.7.1
+  cd nettle-2.7.1
+    generic_configure "--disable-openssl"
+    do_make_and_make_install
+  cd ..
+}
+
+build_vidstab() {
+  do_git_checkout https://github.com/georgmartius/vid.stab.git vid.stab "430b4cffeb" # 0.9.8
+  cd vid.stab
+    sed -i.bak "s/SHARED/STATIC/g" CMakeLists.txt # static build-ify
+    do_cmake_and_install
+  cd ..
+}
+
+build_gnutls() {
+  download_and_unpack_file ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-3.3.19.tar.xz gnutls-3.3.19
+  cd gnutls-3.3.19
+    generic_configure "--disable-cxx --disable-doc --enable-local-libopts --disable-guile"
+    do_make_and_make_install
+  cd ..
+}
+
+build_openjpeg() {
+  download_and_unpack_file http://sourceforge.net/projects/openjpeg.mirror/files/1.5.2/openjpeg-1.5.2.tar.gz/download openjpeg-1.5.2
+  cd openjpeg-1.5.2
+    export CFLAGS="$CFLAGS -DOPJ_STATIC" # see https://github.com/rdp/ffmpeg-windows-build-helpers/issues/37
+    generic_configure_make_install
+    export CFLAGS=$original_cflags # reset it
+  cd ..
+}
+
+build_vo_aacenc() {
+  generic_download_and_install http://sourceforge.net/projects/opencore-amr/files/vo-aacenc/vo-aacenc-0.1.3.tar.gz/download vo-aacenc-0.1.3
+}
+
+build_zlib() {
+  download_and_unpack_file http://sourceforge.net/projects/libpng/files/zlib/1.2.8/zlib-1.2.8.tar.gz/download zlib-1.2.8
+  cd zlib-1.2.8
+    do_configure "--static --prefix=$TARGET_DIR"
+    do_make_and_make_install
+  cd ..
+}
+
+build_bzlib2() {
+  download_and_unpack_file http://fossies.org/linux/misc/bzip2-1.0.6.tar.gz bzip2-1.0.6
+  cd bzip2-1.0.6
+    do_make
+    do_make_install "" "PREFIX=$TARGET_DIR"
+  cd ..
+}
+
+build_x264() {
+  do_git_checkout "http://repo.or.cz/r/x264.git" "x264" "origin/stable"
+  cd x264
+    generic_configure "--enable-strip --disable-lavf --disable-opencl"
+    do_make_and_make_install
+  cd ..
+}
+
+build_lame() {
+  generic_download_and_install http://downloads.sourceforge.net/project/lame/lame/3.99/lame-3.99.5.tar.gz lame-3.99.5
+}
+
+
+# Utility functions
+
+update_to_desired_git_branch_or_revision() {
+  local to_dir="$1"
+  local desired_branch="$2" # or tag or whatever...
+  if [ -n "$desired_branch" ]; then
+   pushd $to_dir
+      echo "git checkout'ing $desired_branch"
+      git checkout "$desired_branch" || exit 1 # if this fails, nuke the directory first...
+      git merge "$desired_branch" || exit 1 # this would be if they want to checkout a revision number, not a branch...
+   popd # in case it's a cd to ., don't want to cd to .. here...since sometimes we call it with a '.'
+  fi
+}
+
+do_git_checkout() {
+  local repo_url="$1"
+  local to_dir="$2"
+  if [[ -z $to_dir ]]; then
+    echo "got empty to dir for git checkout?"
+    exit 1
+  fi
+  local desired_branch="$3"
+  if [ ! -d $to_dir ]; then
+    echo "Downloading (via git clone) $to_dir from $repo_url"
+    rm -rf $to_dir.tmp # just in case it was interrupted previously...
+    # prevent partial checkouts by renaming it only after success
+    git clone $repo_url $to_dir.tmp || exit 1
+    mv $to_dir.tmp $to_dir
+    echo "done downloading $to_dir"
+    update_to_desired_git_branch_or_revision $to_dir $desired_branch
+  else
+    cd $to_dir
+    old_git_version=`git rev-parse HEAD`
+
+    if [[ -z $desired_branch ]]; then
+      if [[ $git_get_latest = "y" ]]; then
+        echo "Updating to latest $to_dir git version [origin/master]..."
+        git fetch
+        git merge origin/master || exit 1
+      else
+        echo "not doing git get latest pull for latest code $to_dir"
+      fi
+    else
+      if [[ $git_get_latest = "y" ]]; then
+        echo "Doing git fetch $to_dir in case it affects the desired branch [$desired_branch]"
+        git fetch
+        git merge $desired_branch || exit 1
+      else
+        echo "not doing git fetch $to_dir to see if it affected desired branch [$desired_branch]"
+      fi
+    fi
+    update_to_desired_git_branch_or_revision "." $desired_branch
+    new_git_version=`git rev-parse HEAD`
+    if [[ "$old_git_version" != "$new_git_version" ]]; then
+     echo "got upstream changes, forcing re-configure."
+     rm -f already*
+    else
+     echo "this pull got no new upstream changes, not forcing re-configure... (already at $new_git_version)"
+    fi 
+    cd ..
+  fi
+}
+
+get_small_touchfile_name() { # have to call with assignment like a=$(get_small...)
+  local beginning="$1"
+  local extra_stuff="$2"
+  local touch_name="${beginning}_$(echo -- $extra_stuff $CFLAGS | /usr/bin/env md5sum)" # make it smaller
+  touch_name=$(echo "$touch_name" | sed "s/ //g") # md5sum introduces spaces, remove them
+  echo "$touch_name" # bash cruddy return system LOL
+} 
+
+do_configure() {
+  local configure_options="$1"
+  local configure_name="$2"
+  if [[ "$configure_name" = "" ]]; then
+    configure_name="./configure"
+  fi
+  local cur_dir2=$(pwd)
+  local english_name=$(basename $cur_dir2)
+  local touch_name=$(get_small_touchfile_name already_configured "$configure_options $configure_name $LDFLAGS $CFLAGS")
+  if [ ! -f "$touch_name" ]; then
+    make clean # just in case useful...try and cleanup stuff...possibly not useful
+    # make uninstall # does weird things when run under ffmpeg src so disabled
+    if [ -f bootstrap ]; then
+      ./bootstrap
+    fi
+    if [ -f bootstrap.sh ]; then
+      ./bootstrap.sh
+    fi
+    if [[ ! -f $configure_name ]]; then
+      autoreconf -fiv # a handful of them require this  to create ./configure :|
+    fi
+    rm -f already_* # reset
+    echo "configuring $english_name ($PWD) as $ PATH=$path_addition:$original_path $configure_name $configure_options"
+    nice "$configure_name" $configure_options || exit 1
+    touch -- "$touch_name"
+    make clean # just in case, but sometimes useful when files change, etc.
+  else
+    echo "already configured $(basename $cur_dir2)" 
+  fi
+}
+
+do_make() {
+  local extra_make_options="$1 -j $cpu_count"
+  local cur_dir2=$(pwd)
+  local touch_name=$(get_small_touchfile_name already_ran_make "$extra_make_options")
+
+  if [ ! -f $touch_name ]; then
+    echo
+    echo "making $cur_dir2 as $ PATH=$path_addition:\$PATH make $extra_make_options"
+    echo
+    if [ ! -f configure ]; then
+      make clean # just in case helpful if old junk left around and this is a 're make' and wasn't cleaned at reconfigure time
+    fi
+    nice make $extra_make_options || exit 1
+    touch $touch_name || exit 1 # only touch if the build was OK
+  else
+    echo "already did make $(basename "$cur_dir2")"
+  fi
+}
+
+download_and_unpack_file() {
+  url="$1"
+  output_name=$(basename $url)
+  output_dir="$2"
+  if [ ! -f "$output_dir/unpacked.successfully" ]; then
+    echo "downloading $url"
+    if [[ -f $output_name ]]; then
+      rm $output_name || exit 1
+    fi
+
+    #  From man curl
+    #  -4, --ipv4
+    #  If curl is capable of resolving an address to multiple IP versions (which it is if it is  IPv6-capable),
+    #  this option tells curl to resolve names to IPv4 addresses only.
+    #  avoid a "network unreachable" error in certain [broken Ubuntu] configurations
+
+    curl -4 "$url" -O -L || exit 1
+    tar -xf "$output_name" || unzip "$output_name" || exit 1
+    touch "$output_dir/unpacked.successfully" || exit 1
+    rm "$output_name" || exit 1
+  fi
+}
+
+generic_configure() {
+  local extra_configure_options="$1"
+  do_configure "--prefix=$TARGET_DIR --disable-shared --enable-static $extra_configure_options"
+}
+
+# needs 2 parameters currently [url, name it will be unpacked to]
+generic_download_and_install() {
+  local url="$1"
+  local english_name="$2" 
+  local extra_configure_options="$3"
+  download_and_unpack_file $url $english_name
+  cd $english_name || exit "needs 2 parameters"
+  generic_configure "$extra_configure_options"
+  do_make_and_make_install
+  cd ..
+}
+
+generic_configure_make_install() {
+  generic_configure # no parameters, force them to break it up :)
+  do_make_and_make_install
+}
+
+do_make_and_make_install() {
+  local extra_make_options="$1"
+  do_make "$extra_make_options"
+  do_make_install "$extra_make_options"
+}
+
+do_make_install() {
+  local extra_make_install_options="$1"
+  local override_make_install_options="$2" # startingly, some need/use something different than just 'make install'
+  if [[ -z $override_make_install_options ]]; then
+    local make_install_options="install $extra_make_options"
+  else
+    local make_install_options="$override_make_install_options"
+  fi
+  local touch_name=$(get_small_touchfile_name already_ran_make_install "$make_install_options")
+  if [ ! -f $touch_name ]; then
+    echo "make installing $(pwd) as $ PATH=$path_addition:\$PATH make $make_install_options"
+    nice make $make_install_options || exit 1
+    touch $touch_name || exit 1
+  fi
+}
+
+do_cmake_and_install() {
+  extra_args="$1" 
+  local touch_name=$(get_small_touchfile_name already_ran_cmake "$extra_args")
+
+  if [ ! -f $touch_name ]; then
+    rm -f already_* # reset so that make will run again if option just changed
+    local cur_dir2=$(pwd)
+    echo doing cmake in $cur_dir2 with PATH=$path_addition:\$PATH with extra_args=$extra_args like this:
+    cmake –G”Unix Makefiles” . -DENABLE_STATIC_RUNTIME=1 -DCMAKE_INSTALL_PREFIX=$TARGET_DIR || exit 1
+    touch $touch_name || exit 1
+  fi
+  do_make_and_make_install
+}
+
+
+
+# Setting intial values
+cpu_count="$(grep -c processor /proc/cpuinfo 2>/dev/null)" # linux cpu count
+if [ -z "$cpu_count" ]; then
+  cpu_count=`sysctl -n hw.ncpu | tr -d '\n'` # OS X
+  if [ -z "$cpu_count" ]; then
+    echo "warning, unable to determine cpu count, defaulting to 1"
+    cpu_count=1 # else default to just 1, instead of blank, which means infinite 
   fi
 fi
 
+ffmpeg_git="https://github.com/FFmpeg/FFmpeg.git"
+force_ffmpeg_rebuild=y
+
+
+while true; do
+  case $1 in
+    -h | --help ) echo "available options [with defaults]:
+      --ffmpeg-git=\"https://github.com/FFmpeg/FFmpeg.git\"
+      --force-ffmpeg-rebuild=y"; exit 0 ;;
+    --ffmpeg-git=* ) ffmpeg_git="${1#*=}"; shift ;;
+    --force-ffmpeg-rebuild=* ) force_ffmpeg_rebuild="${1#*=}"; shift ;;
+    -- ) shift; break ;;
+    -* ) echo "Error, unknown option: '$1'."; exit 1 ;;
+    * ) break ;;
+  esac
+done
+
+check_missing_packages
+
 cd `dirname $0`
+
+# Setup environment
 ENV_ROOT=`pwd`
-. ./env.source
+export ENV_ROOT
+BUILD_DIR="${BUILD_DIR:-$ENV_ROOT/build}"
+TARGET_DIR="${TARGET_DIR:-$ENV_ROOT/target}"
+export LDFLAGS="-L${TARGET_DIR}/lib"
+export DYLD_LIBRARY_PATH="${TARGET_DIR}/lib"
+export PKG_CONFIG_PATH="$TARGET_DIR/lib/pkgconfig"
+export CFLAGS="-I${TARGET_DIR}/include $LDFLAGS"
+export PATH="${TARGET_DIR}/bin:${PATH}"
+export original_cflags=$CFLAGS # copy CFLAGS
+# Force PATH cache clearing
+hash -r
 
-rm -rf "$BUILD_DIR" "$TARGET_DIR"
-mkdir -p "$BUILD_DIR" "$TARGET_DIR"
 
-# NOTE: this is a fetchurl parameter, nothing to do with the current script
-#export TARGET_DIR_DIR="$BUILD_DIR"
 
-echo "#### FFmpeg static build, by STVS SA ####"
+echo "Building ffmpeg..."
+mkdir -p $BUILD_DIR
 cd $BUILD_DIR
-../fetchurl "http://www.tortall.net/projects/yasm/releases/yasm-1.3.0.tar.gz"
-../fetchurl "http://zlib.net/zlib-1.2.8.tar.gz"
-../fetchurl "http://www.bzip.org/1.0.6/bzip2-1.0.6.tar.gz"
-../fetchurl "ftp://ftp.videolan.org/pub/x264/snapshots/last_x264.tar.bz2"
-../fetchurl "http://downloads.sourceforge.net/project/lame/lame/3.99/lame-3.99.5.tar.gz"
-../fetchurl "https://www.openssl.org/source/openssl-1.0.1q.tar.gz"
-git clone git://git.ffmpeg.org/rtmpdump
-git clone https://github.com/mintert/FFmpeg.git
-../fetchurl "http://www.lysator.liu.se/~nisse/archive/nettle-2.7.1.tar.gz"
-wget "ftp://ftp.gnutls.org/gcrypt/gnutls/v3.3/gnutls-3.3.19.tar.xz"
-tar xf gnutls-3.3.19.tar.xz
-rm -f gnutls-3.3.19.tar.xz
-../fetchurl "http://downloads.sourceforge.net/project/openjpeg.mirror/1.5.2/openjpeg-1.5.2.tar.gz"
-../fetchurl "https://github.com/georgmartius/vid.stab/archive/release-0.98.tar.gz"
-../fetchurl "http://downloads.sourceforge.net/project/opencore-amr/vo-aacenc/vo-aacenc-0.1.3.tar.gz"
-
-
-echo "*** Building vidstab ***"
-cd $BUILD_DIR/vid.stab*
-sed -i.bak "s/SHARED/STATIC/g" CMakeLists.txt
-cmake –G”Unix Makefiles” . -DENABLE_STATIC_RUNTIME=1 -DCMAKE_INSTALL_PREFIX=$TARGET_DIR || exit 1
-make -j $jval
-make install
-
-
-echo "*** Building vo_aacenc ***"
-cd $BUILD_DIR/vo-aacenc*
-./configure --prefix=$TARGET_DIR --disable-shared --enable-static
-make -j $jval
-make install
-
-
-echo "*** Building libopenjpeg ***"
-cd $BUILD_DIR/openjpeg*
-old_cflags="$CFLAGS"
-export CFLAGS="$CFLAGS -DOPJ_STATIC"
-./bootstrap.sh
-./configure --prefix=$TARGET_DIR --disable-shared --enable-static
-make -j $jval
-make install
-export CFLAGS="$old_cflags"
-
-
-echo "*** Building libnettle ***"
-cd $BUILD_DIR/nettle*
-./configure --prefix=$TARGET_DIR --disable-openssl --enable-static --disable-shared
-make -j $jval
-make install
-
-echo "*** Building gnutls ***"
-cd $BUILD_DIR/gnutls*
-./configure --prefix=$TARGET_DIR --disable-cxx --disable-doc --enable-local-libopts --disable-guile --enable-static --disable-shared
-make -j $jval
-make install
-
-echo "*** Building yasm ***"
-cd $BUILD_DIR/yasm*
-./configure --prefix=$TARGET_DIR
-make -j $jval
-make install
-
-echo "*** Building zlib ***"
-cd $BUILD_DIR/zlib*
-./configure --prefix=$TARGET_DIR
-make -j $jval
-make install
-
-echo "*** Building openssl ***"
-cd $BUILD_DIR/openssl*
-./config --prefix=$TARGET_DIR no-shared
-make
-make install
-
-echo "*** Building bzip2 ***"
-cd $BUILD_DIR/bzip2*
-make
-make install PREFIX=$TARGET_DIR
-
-echo "*** Building x264 ***"
-cd $BUILD_DIR/x264*
-./configure --prefix=$TARGET_DIR --enable-static --disable-shared --disable-opencl
-make -j $jval
-make install
-
-echo "*** Building lame ***"
-cd $BUILD_DIR/lame*
-./configure --prefix=$TARGET_DIR --enable-static --disable-shared
-make -j $jval
-make install
-
-# FFMpeg
-echo "*** Building FFmpeg ***"
-cd $BUILD_DIR/FFmpeg*
-
-postpend_configure_opts="--disable-decoders --disable-encoders --enable-encoder=png --enable-encoder=apng --enable-encoder=ljpeg --enable-encoder=jpeg2000 --enable-encoder=bmp --enable-encoder=libx264 --enable-encoder=rawvideo --enable-decoder=png --enable-decoder=apng --enable-decoder=jpeg2000 --enable-decoder=bmp --enable-decoder=aac --enable-avisynth --enable-libvo_aacenc --enable-encoder=libvo_aacenc --enable-decoder=pcm_s16le --enable-decoder=pcm_f64le --enable-decoder=rawvideo --enable-encoder=mjpeg --enable-decoder=mjpeg --extra-libs=-lstdc++ --extra-libs=-lpng --enable-libvidstab"
-postpend_configureOpts="--enable-static --disable-shared $postpend_configure_opts"
-
-CFLAGS="-I$TARGET_DIR/include" \
-LDFLAGS="-L$TARGET_DIR/lib -lm" \
-./configure \
-  --extra-cflags="-I$TARGET_DIR/include -static" \
-  --extra-ldflags="-L$TARGET_DIR/lib -lm -static" \
-  --pkg-config-flags=--static \
-  --extra-version=static \
-  --disable-debug \
-  --extra-cflags=--static \
-  --disable-ffplay \
-  --disable-ffserver \
-  --disable-doc \
-  --enable-gpl \
-  --enable-libx264 \
-  --enable-version3 \
-  --enable-libmp3lame \
-  --enable-zlib \
-  --enable-libopenjpeg \
-  --enable-gnutls \
-  --enable-libfreetype \
-  --enable-zlib \
-  --enable-bzlib \
-  --enable-gray \
-  --enable-runtime-cpudetect \
-  --extra-libs="-ldl" \
-  $postpend_configure_opts \
-  --prefix=${OUTPUT_DIR:-$TARGET_DIR}
-make -j $jval && make install
+  build_dependencies
+  build_ffmpeg
+cd ..
