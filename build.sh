@@ -42,7 +42,9 @@ build_ffmpeg() {
   postpend_configure_opts="--enable-static --disable-shared $postpend_configure_opts --prefix=${OUTPUT_DIR:-$TARGET_DIR}"
 
   do_git_checkout $ffmpeg_git ffmpeg
+
   cd ffmpeg
+    apply_ffmpeg_patches
     config_options="--enable-gpl --enable-libx264 --enable-version3 --enable-libmp3lame --enable-zlib --enable-libopenjpeg --enable-gnutls --enable-libfreetype  --enable-bzlib"
     config_options="$config_options --pkg-config-flags=--static --extra-version=static --extra-cflags=-I${TARGET_DIR}/include --extra-ldflags=-L${TARGET_DIR}/lib --extra-libs=-ldl"
     config_options="$config_options --disable-debug --disable-ffplay --disable-ffserver --disable-doc"
@@ -56,6 +58,36 @@ build_ffmpeg() {
 
     do_make_and_make_install
   cd ..
+}
+
+apply_ffmpeg_patches() {
+  if [ -d "$FFMPEG_PATCHES_DIR" ]; then
+    for f in "$FFMPEG_PATCHES_DIR/*.patch"; do
+      apply_patch $f
+    done
+  fi
+}
+
+apply_patch() {
+ local patch_file=$1
+ local patch_type=$2
+ if [[ -z $patch_type ]]; then
+   patch_type="-p0"
+ fi
+ local patch_name=$(basename $patch_file)
+ local patch_done_name="$patch_name.done"
+ if [[ ! -e $patch_done_name ]]; then
+   if [[ -f $patch_name ]]; then
+     rm $patch_name || exit 1 # remove old version in case it has been since updated
+   fi
+   curl -4 $url -O || exit 1
+   echo "applying patch $patch_name"
+   patch $patch_type < "$patch_file" || exit 1
+   touch $patch_done_name || exit 1
+   rm -f already_ran* # if it's a new patch, reset everything too, in case it's really really really new
+ else
+   echo "patch $patch_name already applied"
+ fi
 }
 
 build_dependencies() {
@@ -385,6 +417,7 @@ ENV_ROOT=`pwd`
 export ENV_ROOT
 BUILD_DIR="${BUILD_DIR:-$ENV_ROOT/build}"
 TARGET_DIR="${TARGET_DIR:-$ENV_ROOT/target}"
+FFMPEG_PATCHES_DIR="${FFMPEG_PATCHES_DIR:-$ENV_ROOT/ffmpeg_patches}"
 export LDFLAGS="-L${TARGET_DIR}/lib"
 export DYLD_LIBRARY_PATH="${TARGET_DIR}/lib"
 export PKG_CONFIG_PATH="$TARGET_DIR/lib/pkgconfig"

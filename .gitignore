@@ -1,3 +1,4 @@
 build/
 target/
+ffmpeg_patches/
 *.swp
