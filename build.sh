@@ -43,8 +43,8 @@ build_ffmpeg() {
 
   do_git_checkout $ffmpeg_git ffmpeg
   cd ffmpeg
-    config_options="--enable-gpl --enable-libx264 --enable-version3 --enable-libmp3lame --enable-zlib --enable-libopenjpeg --enable-gnutls --enable-libfreetype  --enable-bzlib"
-    config_options="$config_options --pkg-config-flags=--static --extra-version=static --extra-cflags=-I${TARGET_DIR}/include --extra-ldflags=-L${TARGET_DIR}/lib --extra-libs=-ldl"
+    config_options="--enable-gpl --enable-libpulse --enable-libx264 --enable-version3 --enable-libmp3lame --enable-zlib --enable-libopenjpeg --enable-gnutls --enable-libfreetype  --enable-bzlib"
+    config_options="$config_options --pkg-config-flags=--static --extra-version=static --extra-cflags=-I${TARGET_DIR}/include --extra-ldflags=-L${TARGET_DIR}/lib --extra-libs=-ldl --extra-libs=-ljson --extra-libs=-lrt --extra-libs=-ljson-c --extra-cflags=--static --extra-cflags=-static --extra-ldflags=-static"
     config_options="$config_options --disable-debug --disable-ffplay --disable-ffserver --disable-doc"
 
     config_options="$config_options $postpend_configure_opts"
@@ -69,6 +69,44 @@ build_dependencies() {
   build_bzlib2
   build_x264
   build_lame
+  build_json_c
+  build_sndfile
+  build_pulseaudio
+  build_freetype
+}
+
+build_freetype() {
+  download_and_unpack_file http://download.savannah.gnu.org/releases/freetype/freetype-2.5.5.tar.gz freetype-2.5.5
+  cd freetype-2.5.5
+    generic_configure "--with-png=no"
+    do_make_and_make_install
+  cd ..
+}
+
+build_json_c() {
+  do_git_checkout https://github.com/json-c/json-c json-c "97ef110" # 0.11
+  cd json-c
+    sh autogen.sh
+    generic_configure
+    do_make_and_make_install
+  cd ..
+}
+
+build_sndfile() {
+  download_and_unpack_file http://www.mega-nerd.com/libsndfile/files/libsndfile-1.0.26.tar.gz libsndfile-1.0.26
+  cd libsndfile-1.0.26
+    generic_configure
+    do_make_and_make_install
+  cd ..
+}
+
+build_pulseaudio() {
+  download_and_unpack_file http://freedesktop.org/software/pulseaudio/releases/pulseaudio-8.0.tar.gz pulseaudio-8.0
+  cd pulseaudio-8.0
+    #patch -p0 < $ENV_ROOT/padsp.c-no-obsolete-macros.patch
+    generic_configure "--without-caps --disable-systemd-daemon --disable-udev"
+    do_make_and_make_install "-lrt"
+  cd ..
 }
 
 build_gmp() {
@@ -391,6 +429,7 @@ export PKG_CONFIG_PATH="$TARGET_DIR/lib/pkgconfig"
 export CFLAGS="-I${TARGET_DIR}/include $LDFLAGS"
 export PATH="${TARGET_DIR}/bin:${PATH}"
 export original_cflags=$CFLAGS # copy CFLAGS
+export PKG_CONFIG_LIBDIR= # disable pkg-config from finding [and using] normal linux system installed libs [yikes]
 # Force PATH cache clearing
 hash -r
 

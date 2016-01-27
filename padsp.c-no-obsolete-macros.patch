@@ -1,0 +1,33 @@
+--- src/utils/padsp.c	2016-01-18 02:14:20.000000000 -0800
++++ src/utils/padsp.c	2016-01-26 06:32:08.522611668 -0800
+@@ -2278,30 +2278,6 @@
+             break;
+         }
+ 
+-        case SOUND_PCM_READ_RATE:
+-            debug(DEBUG_LEVEL_NORMAL, __FILE__": SOUND_PCM_READ_RATE\n");
+-
+-            pa_threaded_mainloop_lock(i->mainloop);
+-            *(int*) argp = i->sample_spec.rate;
+-            pa_threaded_mainloop_unlock(i->mainloop);
+-            break;
+-
+-        case SOUND_PCM_READ_CHANNELS:
+-            debug(DEBUG_LEVEL_NORMAL, __FILE__": SOUND_PCM_READ_CHANNELS\n");
+-
+-            pa_threaded_mainloop_lock(i->mainloop);
+-            *(int*) argp = i->sample_spec.channels;
+-            pa_threaded_mainloop_unlock(i->mainloop);
+-            break;
+-
+-        case SOUND_PCM_READ_BITS:
+-            debug(DEBUG_LEVEL_NORMAL, __FILE__": SOUND_PCM_READ_BITS\n");
+-
+-            pa_threaded_mainloop_lock(i->mainloop);
+-            *(int*) argp = pa_sample_size(&i->sample_spec)*8;
+-            pa_threaded_mainloop_unlock(i->mainloop);
+-            break;
+-
+         case SNDCTL_DSP_GETOPTR: {
+             count_info *info;
+ 
