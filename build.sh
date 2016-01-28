@@ -106,6 +106,7 @@ build_dependencies() {
   build_pulseaudio
   build_freetype
   build_pthreadstubs
+  build_xproto
   build_xau
   build_xcbproto
   build_xcb
@@ -114,6 +115,14 @@ build_dependencies() {
   build_inputproto
   build_kbproto
   build_xlib
+}
+
+build_xproto() {
+  download_and_unpack_file http://xorg.freedesktop.org/archive/individual/proto/xproto-7.0.28.tar.gz xproto-7.0.28
+  cd xproto-7.0.28
+    generic_configure
+    do_make_and_make_install
+  cd ..
 }
 
 build_xtrans() {
