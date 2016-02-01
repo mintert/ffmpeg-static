@@ -38,7 +38,7 @@ check_missing_packages() {
 }
 
 build_ffmpeg() {
-  local postpend_configure_opts="--disable-decoders --disable-encoders --enable-encoder=png --enable-encoder=apng --enable-encoder=ljpeg --enable-encoder=jpeg2000 --enable-encoder=bmp --enable-encoder=libx264 --enable-encoder=rawvideo --enable-decoder=png --enable-decoder=apng --enable-decoder=jpeg2000 --enable-decoder=bmp --enable-decoder=aac --enable-avisynth --enable-libvo_aacenc --enable-encoder=libvo_aacenc --enable-decoder=pcm_s16le --enable-decoder=pcm_f64le --enable-decoder=rawvideo --enable-encoder=mjpeg --enable-decoder=mjpeg --extra-libs=-lstdc++ --extra-libs=-lpng --enable-libvidstab"
+  local postpend_configure_opts="--disable-decoders --disable-encoders --enable-encoder=png --enable-encoder=apng --enable-encoder=ljpeg --enable-encoder=jpeg2000 --enable-encoder=bmp --enable-encoder=libx264 --enable-encoder=rawvideo --enable-decoder=png --enable-decoder=apng --enable-decoder=jpeg2000 --enable-decoder=bmp --enable-decoder=aac --enable-avisynth --enable-decoder=pcm_s16le --enable-decoder=pcm_f64le --enable-decoder=rawvideo --enable-encoder=mjpeg --enable-decoder=mjpeg --extra-libs=-lstdc++ --extra-libs=-lpng --enable-libvidstab"
   postpend_configure_opts="--enable-static --disable-shared $postpend_configure_opts --prefix=${OUTPUT_DIR:-$TARGET_DIR}"
 
   do_git_checkout $ffmpeg_git ffmpeg
@@ -96,7 +96,6 @@ build_dependencies() {
   build_vidstab
   build_gnutls
   build_openjpeg
-  build_vo_aacenc
   build_zlib
   build_bzlib2
   build_x264
@@ -180,10 +179,6 @@ build_openjpeg() {
     generic_configure_make_install
     export CFLAGS=$original_cflags # reset it
   cd ..
-}
-
-build_vo_aacenc() {
-  generic_download_and_install http://sourceforge.net/projects/opencore-amr/files/vo-aacenc/vo-aacenc-0.1.3.tar.gz/download vo-aacenc-0.1.3
 }
 
 build_zlib() {
