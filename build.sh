@@ -45,7 +45,7 @@ build_ffmpeg() {
 
   cd ffmpeg
     apply_ffmpeg_patches
-    config_options="--enable-gpl --enable-libpulse --enable-libx264 --enable-version3 --enable-libmp3lame --enable-zlib --enable-libopenjpeg --enable-gnutls --enable-libfreetype  --enable-bzlib"
+    config_options="--enable-gpl --enable-libpulse --enable-x11grab --enable-libx264 --enable-version3 --enable-libmp3lame --enable-zlib --enable-libopenjpeg --enable-gnutls --enable-libfreetype  --enable-bzlib"
     config_options="$config_options --pkg-config-flags=--static --extra-version=static --extra-cflags=-I${TARGET_DIR}/include --extra-ldflags=-L${TARGET_DIR}/lib --extra-libs=-ldl --extra-libs=-ljson --extra-libs=-lrt --extra-libs=-ljson-c --extra-cflags=--static --extra-cflags=-static --extra-ldflags=-static"
     config_options="$config_options --disable-debug --disable-ffplay --disable-ffserver --disable-doc"
 
@@ -104,6 +104,97 @@ build_dependencies() {
   build_sndfile
   build_pulseaudio
   build_freetype
+  build_pthreadstubs
+  build_xproto
+  build_xau
+  build_xcbproto
+  build_xcb
+  build_xextproto
+  build_xtrans
+  build_inputproto
+  build_kbproto
+  build_xlib
+}
+
+build_xproto() {
+  download_and_unpack_file http://xorg.freedesktop.org/archive/individual/proto/xproto-7.0.28.tar.gz xproto-7.0.28
+  cd xproto-7.0.28
+    generic_configure
+    do_make_and_make_install
+  cd ..
+}
+
+build_xtrans() {
+  download_and_unpack_file http://www.x.org/releases/X11R7.7/src/lib/xtrans-1.2.7.tar.gz xtrans-1.2.7
+  cd xtrans-1.2.7
+    do_configure "--prefix=$TARGET_DIR"
+    do_make_and_make_install
+    cp xtrans.pc $TARGET_DIR/lib/pkgconfig
+  cd ..
+}
+
+build_inputproto() {
+  download_and_unpack_file http://xorg.freedesktop.org/archive/individual/proto/inputproto-2.3.tar.gz inputproto-2.3
+  cd inputproto-2.3
+    generic_configure
+    do_make_and_make_install
+  cd ..
+}
+
+build_kbproto() {
+  download_and_unpack_file http://xorg.freedesktop.org/archive/individual/proto/kbproto-1.0.7.tar.gz kbproto-1.0.7
+  cd kbproto-1.0.7
+    generic_configure
+    do_make_and_make_install
+  cd ..
+}
+
+build_pthreadstubs() {
+  download_and_unpack_file http://xcb.freedesktop.org/dist/libpthread-stubs-0.3.tar.gz libpthread-stubs-0.3
+  cd libpthread-stubs-0.3
+    generic_configure
+    do_make_and_make_install
+  cd ..
+}
+
+build_xau() {
+  download_and_unpack_file http://www.x.org/releases/X11R7.7/src/lib/libXau-1.0.7.tar.gz libXau-1.0.7
+  cd libXau-1.0.7
+    generic_configure
+    do_make_and_make_install
+  cd ..
+}
+
+build_xcbproto() {
+  download_and_unpack_file http://xcb.freedesktop.org/dist/xcb-proto-1.11.tar.gz xcb-proto-1.11
+  cd xcb-proto-1.11
+    generic_configure
+    do_make_and_make_install
+  cd ..
+}
+
+build_xcb() {
+  download_and_unpack_file http://xcb.freedesktop.org/dist/libxcb-1.11.tar.gz libxcb-1.11
+  cd libxcb-1.11
+    generic_configure
+    do_make_and_make_install
+  cd ..
+}
+
+build_xextproto() {
+  download_and_unpack_file http://xorg.freedesktop.org/releases/individual/proto/xextproto-7.3.0.tar.bz2 xextproto-7.3.0
+  cd xextproto-7.3.0
+    generic_configure
+    do_make_and_make_install
+  cd ..
+}
+
+build_xlib() {
+  download_and_unpack_file http://www.x.org/releases/X11R7.7/src/lib/libX11-1.5.0.tar.gz libX11-1.5.0
+  cd libX11-1.5.0
+    generic_configure
+    do_make_and_make_install
+  cd ..
 }
 
 build_freetype() {
