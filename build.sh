@@ -39,13 +39,14 @@ check_missing_packages() {
 
 build_ffmpeg() {
   local postpend_configure_opts="--disable-decoders --disable-encoders --enable-encoder=aac --enable-encoder=png --enable-encoder=apng --enable-encoder=ljpeg --enable-encoder=jpeg2000 --enable-encoder=bmp --enable-encoder=libx264 --enable-encoder=rawvideo --enable-decoder=png --enable-decoder=apng --enable-decoder=jpeg2000 --enable-decoder=bmp --enable-decoder=aac --enable-avisynth --enable-decoder=pcm_s16le --enable-decoder=pcm_f64le --enable-decoder=rawvideo --enable-encoder=mjpeg --enable-decoder=mjpeg --extra-libs=-lstdc++ --extra-libs=-lpng --enable-libvidstab"
+  postpend_configure_opts="$postpend_configure_opts --enable-decoder=mpeg2video --enable-decoder=mpeg4 --enable-decoder=msmpeg4v1 --enable-decoder=msmpeg4v2 --enable-decoder=msmpeg4v3 --enable-decoder=wmv1 --enable-decoder=wmv2 --enable-decoder=wmv3 --enable-decoder=svq1 --enable-decoder=svq3 --enable-decoder=rpza --enable-decoder=hevc --enable-decoder=flashsv --enable-decoder=flashsv2 --enable-decoder=aic --enable-decoder=vp6 --enable-decoder=vp6a --enable-decoder=vp6f --enable-decoder=vp7 --enable-decoder=vp8 --enable-decoder=vp9"
   postpend_configure_opts="--enable-static --disable-shared $postpend_configure_opts --prefix=${OUTPUT_DIR:-$TARGET_DIR}"
 
   do_git_checkout $ffmpeg_git ffmpeg
 
   cd ffmpeg
     apply_ffmpeg_patches
-    config_options="--enable-gpl --enable-libpulse --enable-x11grab --enable-libx264 --enable-version3 --enable-libmp3lame --enable-zlib --enable-libopenjpeg --enable-gnutls --enable-libfreetype  --enable-bzlib"
+    config_options="--enable-gpl --enable-libpulse --enable-x11grab --enable-libx264 --enable-libvpx --enable-version3 --enable-libmp3lame --enable-zlib --enable-libopenjpeg --enable-gnutls --enable-libfreetype  --enable-bzlib"
     config_options="$config_options --pkg-config-flags=--static --extra-version=static --extra-cflags=-I${TARGET_DIR}/include --extra-ldflags=-L${TARGET_DIR}/lib --extra-libs=-ldl --extra-libs=-ljson --extra-libs=-lrt --extra-libs=-ljson-c --extra-cflags=--static --extra-cflags=-static --extra-ldflags=-static"
     config_options="$config_options --disable-debug --disable-ffplay --disable-ffserver --disable-doc"
 
@@ -114,6 +115,15 @@ build_dependencies() {
   build_inputproto
   build_kbproto
   build_xlib
+  build_vpx
+}
+
+build_vpx() {
+  download_and_unpack_file https://github.com/webmproject/libvpx/archive/v1.5.0.tar.gz libvpx-1.5.0
+  cd libvpx-1.5.0
+    generic_configure
+    do_make_and_make_install
+  cd ..
 }
 
 build_xproto() {
