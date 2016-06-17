@@ -38,8 +38,7 @@ check_missing_packages() {
 }
 
 build_ffmpeg() {
-  local postpend_configure_opts="--disable-decoders --disable-encoders --enable-encoder=aac --enable-encoder=png --enable-encoder=apng --enable-encoder=ljpeg --enable-encoder=jpeg2000 --enable-encoder=bmp --enable-encoder=libx264 --enable-encoder=rawvideo --enable-decoder=png --enable-decoder=apng --enable-decoder=jpeg2000 --enable-decoder=bmp --enable-decoder=aac --enable-avisynth --enable-decoder=pcm_s16le --enable-decoder=pcm_f64le --enable-decoder=rawvideo --enable-encoder=mjpeg --enable-decoder=mjpeg --extra-libs=-lstdc++ --extra-libs=-lpng --enable-libvidstab"
-  postpend_configure_opts="$postpend_configure_opts --enable-decoder=mpeg2video --enable-decoder=mpeg4 --enable-decoder=msmpeg4v1 --enable-decoder=msmpeg4v2 --enable-decoder=msmpeg4v3 --enable-decoder=wmv1 --enable-decoder=wmv2 --enable-decoder=wmv3 --enable-decoder=svq1 --enable-decoder=svq3 --enable-decoder=rpza --enable-decoder=hevc --enable-decoder=flashsv --enable-decoder=flashsv2 --enable-decoder=aic --enable-decoder=vp6 --enable-decoder=vp6a --enable-decoder=vp6f --enable-decoder=vp7 --enable-decoder=vp8 --enable-decoder=vp9"
+  local postpend_configure_opts="--disable-encoders --enable-encoder=aac --enable-encoder=png --enable-encoder=apng --enable-encoder=ljpeg --enable-encoder=jpeg2000 --enable-encoder=bmp --enable-encoder=libx264 --enable-encoder=rawvideo --enable-avisynth --enable-encoder=mjpeg --extra-libs=-lstdc++ --extra-libs=-lpng --enable-libvidstab"
   postpend_configure_opts="--enable-static --disable-shared $postpend_configure_opts --prefix=${OUTPUT_DIR:-$TARGET_DIR}"
 
   do_git_checkout $ffmpeg_git ffmpeg
